@@ -1,0 +1,71 @@
+version: '3.5'
+services:
+  provider:
+    container_name: provider
+    image: provider
+    build:
+      dockerfile: Dockerfile
+      context: .
+    environment:
+      - SERVICE_PORT=2122
+      - DB_HOST=mysql-primary
+      - DB_PORT=3306
+      - DB_USER=provider_user
+      - DB_PASS=Gj7BDvmL8SD
+      - DB_NAME=provider_development
+      - RDB_HOST=mysql-secondary
+      - RDB_PORT=3306
+      - RDB_USER=provider_user
+      - RDB_PASS=Gj7BDvmL8SD
+      - RDB_NAME=provider_development
+      - PROVIDER_SOURCE_HEADER=X-Slurm-Source-Provider
+      - PROVIDER_SOURCE_TOKEN=voronezh
+      - AUTH_SERVICE_URL=http://auth_service:2121
+    ports:
+      - 2122:2122
+    networks:
+      - sre
+
+  mysql-primary:
+    image: 'bitnami/mysql:8.0.18-debian-9-r26'
+    ports:
+      - '3306'
+    volumes:
+      - ./config/my_custom.cnf:/opt/bitnami/mysql/conf/my_custom.cnf:ro
+    environment:
+      - MYSQL_REPLICATION_MODE=master
+      - MYSQL_REPLICATION_USER=repl_user
+      - MYSQL_USER=provider_user
+      - MYSQL_DATABASE=provider_development
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_ROOT_PASSWORD=Gj7BDvmL8SD
+      - MYSQL_PASSWORD=Gj7BDvmL8SD
+    networks:
+      - sre
+
+  mysql-secondary:
+    image: 'bitnami/mysql:8.0.18-debian-9-r26'
+    ports:
+      - '3306'
+    volumes:
+      - ./config/my_custom.cnf:/opt/bitnami/mysql/conf/my_custom.cnf:ro
+    depends_on:
+      - mysql-primary
+    environment:
+      - MYSQL_REPLICATION_MODE=slave
+      - MYSQL_REPLICATION_USER=repl_user
+      - MYSQL_USER=provider_user
+      - MYSQL_DATABASE=provider_development
+      - MYSQL_MASTER_HOST=mysql-primary
+      - MYSQL_MASTER_PORT_NUMBER=3306
+      - MYSQL_MASTER_ROOT_PASSWORD=Gj7BDvmL8SD
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_PASSWORD=Gj7BDvmL8SD
+    networks:
+      - sre
+
+networks:
+  sre:
+    name: sre

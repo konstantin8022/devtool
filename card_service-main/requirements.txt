@@ -1,0 +1,5 @@
+aiohttp==3.7.3
+grpcio
+grpcio-tools
+aioprometheus[aiohttp,binary]
+aioredis==1.3.1

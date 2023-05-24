@@ -1,0 +1,14 @@
+version: '3.5'
+services:
+  card_service:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre}/${CI_PROJECT_NAME:-card_service}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}
+    environment:
+      - SERVICE_PORT=3000
+    ports:
+      - "3000:3000"
+    networks:
+      - sre
+
+networks:
+  sre:
+    name: sre

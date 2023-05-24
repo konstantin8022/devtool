@@ -1,0 +1,35 @@
+version: '3.5'
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+    - 9090:9090
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - sre2
+
+  api-gateway:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre}/${CI_PROJECT_NAME:-api-gateway}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}
+    build:
+      dockerfile: Dockerfile
+      context: .
+    environment:
+      - SERVICE_PORT=3000
+      - PROVIDERS_TIMEOUT=60
+      - REDIS_HOST=redis
+      - JWT_HMAC_SECRET=72884861-ea71-44ab-8f55-b8f2a13f46a8
+#    depends_on:
+#      - auth_service
+#      - provider_api
+    ports:
+      - 3000:3000
+    networks:
+      - sre2
+
+networks:
+  sre2:
+    name: sre2

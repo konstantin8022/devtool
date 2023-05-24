@@ -1,0 +1,170 @@
+# Variables from gitlab CI/CD
+# K8S_API_URL
+# K8S_CI_TOKEN_PROD:
+
+variables:
+  K8S_API_URL: https://172.20.28.2:6443
+  K8S_CI_TOKEN_PROD: $K8S_CI_TOKEN_PROD
+  CITY: g000005
+
+default:
+  tags:
+    - seck8s
+
+before_script:
+  - date
+
+after_script:
+  - date
+
+stages:
+  - linters
+  - build
+  - vulns
+  - cleanup
+  - push
+  - latest
+  - deploy
+  - deploy_chart
+
+yamllint:
+  stage: linters
+  interruptible: true
+  script:
+    - docker run --rm -v $PWD:/check/ -w /check/ pipelinecomponents/yamllint yamllint -f parsable -c /check/.yamllint .
+
+helmlint:
+  stage: linters
+  interruptible: true
+  script:
+    - pushd .helm
+    - docker run --rm -v $PWD:/controlplane/ -w /controlplane/ centosadmin/kubernetes-helm:3.6.3 helm lint .
+    - popd
+
+build:
+  stage: build
+  interruptible: true
+  script:
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID .
+
+trivy:
+  stage: vulns
+  interruptible: true
+  cache:
+    paths:
+      - .trivycache/trivy/db/
+  script:
+    - docker run
+      --rm
+      -v /var/run/docker.sock:/var/run/docker.sock
+      -v $CI_PROJECT_DIR/.trivycache/:/root/.cache/
+      -e "TRIVY_LIGHT=true"
+      -e "TRIVY_NO_PROGRESS=true"
+      -e "TRIVY_IGNORE_UNFIXED=true"
+      aquasec/trivy
+      --exit-code 0
+      --severity UNKNOWN,LOW,MEDIUM,HIGH
+      $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID
+    - 'docker run --rm -v $PWD:/work -w /work busybox chmod -R 777 .trivycache ||:'
+    - docker run
+      --rm
+      -v /var/run/docker.sock:/var/run/docker.sock
+      -v $CI_PROJECT_DIR/.trivycache/:/root/.cache/
+      -e "TRIVY_LIGHT=true"
+      -e "TRIVY_NO_PROGRESS=true"
+      -e "TRIVY_IGNORE_UNFIXED=true"
+      aquasec/trivy
+      --exit-code 1
+      --severity CRITICAL
+      $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID
+
+cleanup:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - 'docker run --rm -v $PWD:/work -w /work busybox chmod -R 777 .trivycache ||:'
+  when: always
+
+push:
+  stage: push
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - date
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+    - docker push $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID
+
+latest:
+  stage: latest
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - date
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+    - docker tag $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+    - docker push $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+  only:
+    - master
+
+deploy_prod:
+  stage: deploy
+  environment:
+    name: production
+    url: http://controlplane.sre.slurm.io/health
+  script:
+    - docker run
+      --rm
+      -v $PWD/.helm:/.helm
+      -e "K8S_API_URL=$K8S_API_URL"
+      -e "K8S_CI_TOKEN=$K8S_CI_TOKEN_PROD"
+      -e "CI_PROJECT_PATH_SLUG=$CI_PROJECT_PATH_SLUG"
+      -e "CI_ENVIRONMENT_NAME=$CI_ENVIRONMENT_NAME"
+      -e "CI_REGISTRY=$CI_REGISTRY"
+      -e "CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE"
+      -e "CI_PROJECT_NAME=$CI_PROJECT_NAME"
+      -e "CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG"
+      -e "CI_PIPELINE_ID=$CI_PIPELINE_ID"
+      -e "CITY=$CITY"
+      centosadmin/kubernetes-helm:3.6.3
+      /bin/sh -c
+      'kubectl config set-cluster k8s --insecure-skip-tls-verify=true --server="$K8S_API_URL" &&
+      kubectl config set-credentials ci --token="$K8S_CI_TOKEN" &&
+      kubectl config set-context ci --cluster=k8s --user=ci &&
+      kubectl config use-context ci &&
+      helm upgrade --install "${CI_PROJECT_NAME/_/-}" .helm
+        --values .helm/values.yaml
+        --set image.name="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+        --set image.tag="$CI_COMMIT_REF_SLUG.$CI_PIPELINE_ID"
+        --set ingress.host="cp.${CITY}.edu.slurm.io"
+        --timeout 120s
+        --atomic
+        --debug
+        --namespace main'
+  only:
+    - master
+
+pages:
+  tags:
+    - docker-executor
+  stage: deploy_chart
+  image: centosadmin/kubernetes-helm:3.6.3
+  script:
+    - >
+      echo "image:
+        name: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}
+        tag: ${CI_COMMIT_REF_SLUG}.${CI_PIPELINE_ID}
+        imagepullpolicy: IfNotPresent" >> .helm/values.yaml
+    - cat .helm/values.yaml
+    - rm -rf public/*
+    - mkdir -p public
+    - helm package .helm/ --version "1.0.$CI_PIPELINE_ID" --app-version "$CI_PIPELINE_ID" --destination public
+    - echo "helm repo add $CI_PROJECT_NAME http://$CI_PROJECT_NAMESPACE.gitlab.slurm.io/$CI_PROJECT_NAME"
+    - helm repo index --url http://$CI_PROJECT_NAMESPACE.gitlab.slurm.io/$CI_PROJECT_NAME public
+  artifacts:
+    paths:
+      - public
+  only:
+    - master

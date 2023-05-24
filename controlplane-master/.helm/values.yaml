@@ -1,0 +1,52 @@
+# This is a YAML-formatted file.
+
+replicas: 1
+
+image:
+  name: registry.slurm.io/seck8s_main/controlplane
+  tag: latest
+  imagepullpolicy: Always
+imagePullSecret: registry-slurm-io
+
+env:
+  REDIS_HOST: controlplane-redis-master:6379
+  MAIN_API: http://main-backend
+  GITLAB_API: https://gitlab.slurm.io/api/v4/
+  GITLAB_TOKEN: none
+
+#envSecret:
+#  REDIS_PASSWORD: controlplane-redis
+
+service:
+  port: 4000
+  external_port: 4000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+redis:
+  usePassword: false
+  master:
+    persistence:
+      enabled: false
+  cluster:
+    enabled: false
+
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: "basic"
+    nginx.ingress.kubernetes.io/auth-realm: "Controlplane"
+    nginx.ingress.kubernetes.io/auth-secret: "controlplane-basic-auth"
+    nginx.ingress.kubernetes.io/auth-secret-type: "auth-map"
+#  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  labels: {}
+  host: cp.s000.edu.slurm.io
+  tls: []
+    # - secretName: tickets-s000-slurm-io-tls-secret
+    #   hosts:
+    #     - tickets.s000.slurm.io

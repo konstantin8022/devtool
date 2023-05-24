@@ -1,0 +1,6 @@
+version: '3'
+services:
+  tickets:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre}/${CI_PROJECT_NAME:-tickets}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}
+    ports:
+      - "8080:8080"

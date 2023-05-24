@@ -1,0 +1,43 @@
+---
+# This is a YAML-formatted file.
+# Add here student values to ADD and/or OVERRIDE default
+# values.yaml (will be merged together)
+
+replicas: 1
+
+# dont pull already fetched images on production nodes:
+image:
+  name: registry.slurm.io/mesh_main/api_gateway
+  tag: latest
+  imagepullpolicy: IfNotPresent
+imagePullSecret: slurm-gitlab-registry
+
+env:
+  # Keys for verify request signed by auth service
+  PROVIDER_BACKEND_URL: http://provider-backend
+  SERVICE_PORT: 3000
+  CARD_SERVICE_URL: 'card-service:80'
+
+service:
+  port: 3000
+  external_port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  labels: {}
+  host: api-gateway.s000.edu.slurm.io
+  tls: []
+    # - secretName: s000-slurm-io-tls-secret
+    #   hosts:
+    #     - api-gateway.s000.edu.slurm.io
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi

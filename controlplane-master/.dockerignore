@@ -1,0 +1,8 @@
+.git
+.gitignore
+.gitlab-ci.yml
+.kube
+.helm
+.trivycache
+.ci-status.sh
+controlplane

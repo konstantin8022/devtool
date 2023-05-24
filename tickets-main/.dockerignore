@@ -1,0 +1,13 @@
+.git
+.cache
+.gitignore
+.gitlab-ci.yml
+.kube
+.helm
+coverage
+tmp/*
+log/*
+docker-compose*ml
+Dockerfile*
+.trivycache
+.ci-status.sh

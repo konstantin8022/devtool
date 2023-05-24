@@ -1,0 +1,38 @@
+---
+# This is a YAML-formatted file.
+
+replicas: 1
+version: v1
+name: card-service
+
+imagePullSecret: slurm-gitlab-registry
+
+env:
+  SERVICE_PORT: 3000
+  HEALTHCHECK_PORT: 2113
+  MAIN_BACKEND_HOST: 'http://main-backend.main'
+service:
+  enabled: true
+  port: 3000
+  healthcheck_port: 2113
+  external_port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+  labels: {}
+  host: cardservice.s000.edu.slurm.io
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+image:
+  name: registry.slurm.io/seck8s/card_service
+  tag: latest
+  imagepullpolicy: IfNotPresent

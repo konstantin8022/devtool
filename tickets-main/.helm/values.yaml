@@ -1,0 +1,39 @@
+# This is a YAML-formatted file.
+
+replicas: 1
+
+env:
+  VUE_APP_API_URL: http://main-backend.main
+
+envSecret: []
+
+service:
+  port: 8080
+  external_port: 80
+
+ingress:
+  enabled: true
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  labels: {}
+  host: tickets.s000.edu.slurm.io
+  tls: []
+    # - secretName: tickets-s000-slurm-io-tls-secret
+    #   hosts:
+    #     - tickets.s000.slurm.io
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+imagePullSecret: slurm-gitlab-registry
+
+image:
+  name: registry.slurm.io/mesh_main/tickets
+  tag: latest
+  imagepullpolicy: Always

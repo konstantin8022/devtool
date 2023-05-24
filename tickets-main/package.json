@@ -1,0 +1,38 @@
+{
+  "name": "tickets",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "test": "mocha --recursive --timeout 30000 test/selenium/test.js",
+    "test:ui": "mocha --recursive --timeout 30000 test/selenium/ui-test.js",
+    "test:unit": "vue-cli-service test:unit test/unit/*.spec.js"
+  },
+  "dependencies": {
+    "axios": "^0.21.4",
+    "bootstrap": "^4.3.1",
+    "bootstrap-vue": "^2.0.4",
+    "chromedriver": "^78.0.1",
+    "core-js": "^3.3.2",
+    "eslint": "^6.6.0",
+    "selenium-webdriver": "^4.0.0-alpha.5",
+    "vue": "^2.6.10",
+    "vue-axios": "^2.1.5",
+    "vue-router": "^3.1.3",
+    "vue-select": "^3.11.2"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "^4.0.0",
+    "@vue/cli-plugin-router": "^4.0.0",
+    "@vue/cli-plugin-unit-mocha": "^4.5.13",
+    "@vue/cli-plugin-vuex": "^4.0.0",
+    "@vue/cli-service": "^4.5.13",
+    "@vue/test-utils": "^1.0.0-beta.30",
+    "chai": "^4.2.0",
+    "i": "^0.3.6",
+    "mocha": "^6.2.2",
+    "npm": "^6.13.1",
+    "vue-template-compiler": "^2.6.10"
+  }
+}

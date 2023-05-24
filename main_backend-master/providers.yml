@@ -1,0 +1,6 @@
+---
+:cities:
+  1:
+    :name: Камышин
+    :url: http://provider:3000
+:cities_count: 1

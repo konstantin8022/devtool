@@ -1,0 +1,21 @@
+version: '2.1'
+services:
+  auth_service:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre_main}/${CI_PROJECT_NAME:-authorization_service}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}
+    ports:
+      - "9292:9292"
+    depends_on:
+      - redis
+    environment:
+      - RACK_ENV=production
+      - REDIS_HOST=redis
+
+  redis:
+    image: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    logging:
+      driver: none

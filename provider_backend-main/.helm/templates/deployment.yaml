@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  {{- if .Values.annotations }}
+  annotations:
+    {{- range $key, $val := .Values.annotations }}
+    {{ $key }}: {{ $val | quote}}
+    {{- end }}
+  {{- end }}
+  labels:
+    app: {{ .Chart.Name }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    component: app
+  name: {{ .Release.Name }}
+spec:
+  progressDeadlineSeconds: 180
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      release: {{ .Release.Name }}
+      component: app
+  strategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 5
+  template:
+    metadata:
+      annotations:
+        prometheus.io/port: "{{ .Values.service.port }}"
+        prometheus.io/scrape: "true"
+      {{- if .Values.annotations }}
+        {{- range $key, $val := .Values.annotations }}
+        {{ $key }}: {{ $val | quote}}
+        {{- end }}
+      {{- end }}
+      creationTimestamp: null
+      labels:
+        app: {{ .Chart.Name }}
+        release: {{ .Release.Name }}
+        component: app
+    spec:
+      containers:
+      - env:
+        - name: DB_HOST
+          value: {{ .Release.Name }}-mysql{{- if eq .Values.mysql.architecture "replication" -}}-primary{{- end }}
+        - name: DB_PORT
+          value: "3306"
+        - name: RDB_PORT
+          value: "3306"
+        - name: RDB_HOST
+          value: {{ .Release.Name }}-mysql{{- if eq .Values.mysql.architecture "replication" -}}-secondary{{- end }}
+        - name: PROVIDER_URL  # must be keeped in sync with "service.yaml"
+          value: http://{{ .Release.Name }}.{{ .Release.Namespace}}
+        - name: ST_NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: PROVIDER_CITY
+          value: {{ .Release.Name}}
+        - name: PROVIDER_SOURCE_TOKEN
+          value: {{ .Release.Namespace }}
+        {{- range $key, $val := .Values.env }}
+        - name: {{ $key | quote }}
+          value: {{ $val | quote }}
+        {{- end }}
+        {{- range $key, $val := .Values.envSecret }}
+        - name: {{ $key | quote }}
+          valueFrom:
+            secretKeyRef:
+              key: {{ $key | lower | replace "_" "-" }}
+              name: {{ $val }}
+        {{- end }}
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              key: mysql-password
+              name: {{ .Release.Name }}-mysql
+        - name: RDB_PASS
+          valueFrom:
+            secretKeyRef:
+              key: mysql-password
+              name: {{ .Release.Name }}-mysql
+        image: {{ .Values.image.name }}:{{ .Values.image.tag}}
+        imagePullPolicy: {{ .Values.image.imagepullpolicy }}
+        name: app
+        ports:
+        - containerPort: {{ .Values.service.port }}
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /health
+            port: {{ .Values.service.port }}
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        livenessProbe:
+          initialDelaySeconds: 90
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: {{ .Values.service.port }}
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 20

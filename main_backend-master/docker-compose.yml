@@ -1,0 +1,151 @@
+version: '3.5'
+services:
+  mysql-master:
+    container_name: mysql_master
+    image: bitnami/mysql:8.0.18-debian-9-r26
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: mysqladmin -pGj7BDvmL8SD ping
+      interval: 60s
+      timeout: 1s
+      retries: 3
+    environment:
+      - MYSQL_REPLICATION_MODE=master
+      - MYSQL_REPLICATION_USER=repl_user
+      - MYSQL_REPLICATION_PASSWORD=Gj7BDvmL8SD
+      - MYSQL_USER=provider_user
+      - MYSQL_DATABASE=provider_development
+      - MYSQL_ROOT_PASSWORD=Gj7BDvmL8SD
+      - MYSQL_PASSWORD=Gj7BDvmL8SD
+    networks:
+      - sre2
+
+  mysql-slave:
+    container_name: mysql_slave
+    image: bitnami/mysql:8.0.18-debian-9-r26
+    ports:
+      - 3307:3306
+    depends_on:
+      - mysql-master
+    healthcheck:
+      test: mysqladmin -pGj7BDvmL8SD ping
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    environment:
+      - MYSQL_REPLICATION_MODE=slave
+      - MYSQL_REPLICATION_USER=repl_user
+      - MYSQL_REPLICATION_PASSWORD=Gj7BDvmL8SD
+      - MYSQL_USER=provider_user
+      - MYSQL_DATABASE=provider_development
+      - MYSQL_MASTER_HOST=mysql_master
+      - MYSQL_MASTER_PORT_NUMBER=3306
+      - MYSQL_MASTER_ROOT_PASSWORD=Gj7BDvmL8SD
+      - MYSQL_ROOT_PASSWORD=Gj7BDvmL8SD
+      - MYSQL_PASSWORD=Gj7BDvmL8SD
+    networks:
+      - sre2
+
+  redis:
+    container_name: redis
+    image: redis
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    logging:
+      driver: none
+    restart: always
+    command: redis-server --requirepass c0WcWBm2kZjN0ivN
+    ports:
+      - 6379:6379
+    networks:
+      - sre2
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+    - 9090:9090
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - sre2
+
+  main_backend:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre}/${CI_PROJECT_NAME:-main_backend}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}
+    build:
+      dockerfile: Dockerfile
+      context: .
+    environment:
+      - SERVICE_PORT=3000
+      - PROVIDERS_TIMEOUT=60
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=c0WcWBm2kZjN0ivN
+      - JWT_HMAC_SECRET=72884861-ea71-44ab-8f55-b8f2a13f46a8
+#    depends_on:
+#      - auth_service
+#      - provider_api
+    ports:
+      - 3000:3000
+    networks:
+      - sre2
+
+
+#  auth_service:
+#    container_name: auth_service
+#    image: auth_service
+#    build:
+#      dockerfile: docker/Dockerfile
+#      context: .
+#    environment:
+#      - REDIS_HOST=redis
+#      - REDIS_PASSWORD=c0WcWBm2kZjN0ivN
+#      - JWT_HMAC_SECRET_EXPIRE=60
+#      - JWT_HMAC_SECRET=72884861-ea71-44ab-8f55-b8f2a13f46a8
+#      - PROVIDER_AUTH_HEADER=X-Slurm-Source-Provider
+#    depends_on:
+#      - redis
+#    ports:
+#      - 2111:2111
+#    networks:
+#      - sre
+
+
+#  provider_api:
+#    container_name: provider_api
+#    image: provider_api
+#    build:
+#      dockerfile: docker/Dockerfile
+#      context: .
+#    environment:
+#      - DB_HOST=mysql_master
+#      - DB_PORT=3306
+#      - DB_USER=provider_user
+#      - DB_PASS=Gj7BDvmL8SD
+#      - DB_NAME=provider_development
+#      - RDB_HOST=mysql_slave
+#      - RDB_PORT=3306
+#      - RDB_USER=provider_user
+#      - RDB_PASS=Gj7BDvmL8SD
+#      - RDB_NAME=provider_development
+#      - PROVIDER_SOURCE_HEADER=X-Slurm-Source-Provider
+#      - PROVIDER_SOURCE_TOKEN=irkutsk
+#      - AUTH_SERVICE_URL=http://auth_service:2111
+#    ports:
+#      - 2112:2112
+#    depends_on:
+#      - mysql-slave
+#      - mysql-master
+#      - auth_service
+#    networks:
+#      - sre
+
+
+networks:
+  sre2:
+    name: sre2

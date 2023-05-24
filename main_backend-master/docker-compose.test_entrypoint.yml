@@ -1,0 +1,35 @@
+version: '3.5'
+services:
+  main_backend:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre}/${CI_PROJECT_NAME:-main_backend}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}
+    environment:
+      - SERVICE_PORT=3000
+      - PROVIDERS_TIMEOUT=60
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=c0WcWBm2kZjN0ivN
+      - JWT_HMAC_SECRET=72884861-ea71-44ab-8f55-b8f2a13f46a8
+    ports:
+      - "3000:3000"
+    networks:
+      - sre
+
+  redis:
+    container_name: redis
+    image: redis
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    logging:
+      driver: none
+    restart: always
+    command: redis-server --requirepass c0WcWBm2kZjN0ivN
+    ports:
+      - 6379:6379
+    networks:
+      - sre
+
+networks:
+  sre:
+    name: sre

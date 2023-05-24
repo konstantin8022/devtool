@@ -1,0 +1,126 @@
+# Variables from gitlab CI/CD
+# K8S_API_URL
+# K8S_CI_TOKEN_PROD:
+# CITY:
+
+default:
+  tags:
+    - seck8s
+
+before_script:
+  - date
+
+after_script:
+  - date
+
+stages:
+  - linters
+  - build
+  - vulns
+  - push
+  - latest
+  - deploy
+
+yamllint:
+  stage: linters
+  interruptible: true
+  script:
+    - docker run --rm -v $PWD:/check/ -w /check/ pipelinecomponents/yamllint yamllint -f parsable -c /check/.yamllint .
+    - pushd .helm
+    - docker run --rm -v $PWD:/provider_backend/ -w /provider_backend/ hypnoglow/kubernetes-helm:3.0.2 helm lint .
+    - popd
+
+build:
+  stage: build
+  interruptible: true
+  script:
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-$CI_COMMIT_SHORT_SHA .
+
+trivy:
+  stage: vulns
+  interruptible: true
+  cache:
+    paths:
+      - .trivycache/trivy/db/
+  script:
+    - docker run
+      --rm
+      -v /var/run/docker.sock:/var/run/docker.sock
+      -v $CI_PROJECT_DIR/.trivycache/:/root/.cache/
+      -e "TRIVY_LIGHT=true"
+      -e "TRIVY_NO_PROGRESS=true"
+      -e "TRIVY_IGNORE_UNFIXED=true"
+      aquasec/trivy
+      client
+      --exit-code 0
+      --severity UNKNOWN,LOW,MEDIUM,HIGH
+      --remote http://172.20.100.52:28080
+      --token mvMlsavNntCZoBrdM0OH
+      $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-$CI_COMMIT_SHORT_SHA
+    - 'docker run --rm -v $PWD:/work -w /work busybox chmod -R 777 .trivycache ||:'
+    - docker run
+      --rm
+      -v /var/run/docker.sock:/var/run/docker.sock
+      -v $CI_PROJECT_DIR/.trivycache/:/root/.cache/
+      -e "TRIVY_LIGHT=true"
+      -e "TRIVY_NO_PROGRESS=true"
+      -e "TRIVY_IGNORE_UNFIXED=true"
+      aquasec/trivy
+      client
+      --exit-code 1
+      --severity CRITICAL
+      --remote http://172.20.100.52:28080
+      --token mvMlsavNntCZoBrdM0OH
+      $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-$CI_COMMIT_SHORT_SHA
+
+push:
+  stage: push
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - date
+    - docker --config ~/.$CI_PROJECT_PATH_SLUG login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+    - docker --config ~/.$CI_PROJECT_PATH_SLUG push $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_ID-$CI_COMMIT_SHORT_SHA
+
+deploy_prod:
+  stage: deploy
+  resource_group: deploy
+  script:
+    - export CITY=${CITY:-$CI_PROJECT_NAMESPACE}
+    - docker run
+      --rm
+      -v $PWD/.helm:/.helm
+      -e "K8S_API_URL=$K8S_API_URL"
+      -e "K8S_CI_TOKEN=$K8S_CI_TOKEN_PROD"
+      -e "CI_PROJECT_PATH_SLUG=$CI_PROJECT_PATH_SLUG"
+      -e "CI_ENVIRONMENT_NAME=$CI_ENVIRONMENT_NAME"
+      -e "CI_REGISTRY=$CI_REGISTRY"
+      -e "CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE"
+      -e "CI_PROJECT_NAME=$CI_PROJECT_NAME"
+      -e "CI_COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG"
+      -e "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA"
+      -e "CI_PIPELINE_ID=$CI_PIPELINE_ID"
+      -e "CI_PIPELINE_URL=$CI_PIPELINE_URL"
+      -e "CITY=$CITY"
+      centosadmin/kubernetes-helm:3.6.3
+      /bin/sh -c
+      'kubectl config set-cluster k8s --insecure-skip-tls-verify=true --server="$K8S_API_URL" &&
+      kubectl config set-credentials ci --token="$K8S_CI_TOKEN" &&
+      kubectl config set-context ci --cluster=k8s --user=ci &&
+      kubectl config use-context ci &&
+      helm upgrade --install "${CI_PROJECT_NAME/_/-}" .helm
+        --values .helm/values.yaml
+        --set image.name="$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"
+        --set image.tag="$CI_PIPELINE_ID-$CI_COMMIT_SHORT_SHA"
+        --set annotations.ci-branch="$CI_COMMIT_REF_SLUG"
+        --set annotations.ci-commit-short="$CI_COMMIT_SHORT_SHA"
+        --set annotations.ci-pipeline-id="$CI_PIPELINE_ID"
+        --set annotations.ci-pipeline-url="$CI_PIPELINE_URL"
+        --set city="$CITY"
+        --timeout 300s
+        --atomic
+        --debug
+        --namespace "$CITY"'
+  only:
+    - main

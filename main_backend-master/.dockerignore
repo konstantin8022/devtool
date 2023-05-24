@@ -1,0 +1,11 @@
+.git
+.cache
+.gitignore
+.gitlab-ci.yml
+.kube
+.helm
+coverage
+tmp/*
+log/*
+.trivycache
+.ci-status.sh

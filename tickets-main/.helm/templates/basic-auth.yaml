@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app: {{ .Chart.Name }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  name: {{ .Release.Name }}-basic-auth
+type: Opaque
+data:
+  slurm: JGFwcjEkM0tzQVJBbU8kYk9zZk8xaWowM3llVzFQRlhRQWVqMA==

@@ -1,0 +1,21 @@
+---
+version: '3.5'
+services:
+
+  provider:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-sre}/${CI_PROJECT_NAME:-provider_backend}:${CI_PIPELINE_ID:?err}-${CI_COMMIT_SHORT_SHA:?err}
+    container_name: test_provider_backend_$CI_PIPELINE_ID
+    depends_on:
+      - mysql-primary
+      - mysql-secondary
+
+  mysql-primary:
+    container_name: test_mysql_primary_$CI_PIPELINE_ID
+    logging:
+      driver: none
+
+  mysql-secondary:
+    container_name: test_mysql_secondary_$CI_PIPELINE_ID
+    logging:
+      driver: none
+...

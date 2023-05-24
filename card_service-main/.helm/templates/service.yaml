@@ -1,0 +1,22 @@
+{{- if .Values.service.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ .Chart.Name }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    heritage: {{ .Release.Service }}
+    component: app
+  name: {{ .Values.name }}
+spec:
+  ports:
+  - name: grpc
+    port: {{ .Values.service.external_port }}
+    protocol: TCP
+    targetPort: {{ .Values.service.port }}
+  selector:
+    app: {{ .Chart.Name }}
+    component: app
+  sessionAffinity: None
+  type: ClusterIP
+{{- end }}

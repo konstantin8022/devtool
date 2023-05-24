@@ -1,0 +1,23 @@
+version: '3.7'
+services:
+  auth_service:
+    container_name: auth_service
+    image: auth_service
+    build:
+      dockerfile: docker/Dockerfile
+      context: .
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=c0WcWBm2kZjN0ivN
+      - JWT_HMAC_SECRET_EXPIRE=60
+      - JWT_HMAC_SECRET=72884861-ea71-44ab-8f55-b8f2a13f46a8
+      - PROVIDER_AUTH_HEADER=X-Slurm-Source-Provider
+    ports:
+      - 2111:2111
+    networks:
+      - sre
+
+networks:
+  sre:
+    external:
+      name: sre
